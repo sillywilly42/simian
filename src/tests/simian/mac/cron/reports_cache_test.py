@@ -26,23 +26,14 @@ import stubout
 from google.appengine.ext import deferred
 from google.appengine.ext import testbed
 
-from django.conf import settings
-settings.configure()
 from google.apputils import app
 from google.apputils import basetest
 from simian.mac import models
+from tests.simian.mac.common import test
 from simian.mac.cron import reports_cache
 
 
-class ReportsCacheModuleTest(mox.MoxTestBase):
-
-  def setUp(self):
-    mox.MoxTestBase.setUp(self)
-    self.stubs = stubout.StubOutForTesting()
-
-  def tearDown(self):
-    self.mox.UnsetStubs()
-    self.stubs.UnsetAll()
+class ReportsCacheModuleTest(basetest.TestCase):
 
   def testIsTimeDelta(self):
     """Test IsTimeDelta()."""
@@ -77,21 +68,20 @@ class ReportsCacheModuleTest(mox.MoxTestBase):
         reports_cache.IsTimeDelta(dt1, dt2, days=20) is not None)
 
 
-class ReportsCacheCleanupTest(mox.MoxTestBase):
+class ReportsCacheCleanupTest(test.AppengineTest, mox.MoxTestBase):
 
   def setUp(self):
+    test.AppengineTest.setUp(self)
+
     mox.MoxTestBase.setUp(self)
+
     self.stubs = stubout.StubOutForTesting()
 
-    self.testbed = testbed.Testbed()
-    self.testbed.activate()
-    self.testbed.init_all_stubs()
-
   def tearDown(self):
+    test.AppengineTest.tearDown(self)
+
     self.mox.UnsetStubs()
     self.stubs.UnsetAll()
-
-    self.testbed.deactivate()
 
   def _GenDatetimes(self, *add_seconds):
     """Generate a random datetime and additional datetimes after it.
@@ -162,40 +152,13 @@ class ReportsCacheCleanupTest(mox.MoxTestBase):
     """Test _GenerateMsuUserSummary()."""
     rc = reports_cache.ReportsCache()
 
-    reports = None
-    cursor = None
-    summary = None
     summary_output = self._GenBaseSummaryOutput(rc)
 
-    lquery = self.mox.CreateMockAnything()
-    self.mox.StubOutWithMock(reports_cache.models, 'ComputerMSULog')
-    self.mox.StubOutWithMock(reports_cache.models, 'KeyValueCache')
-    self.mox.StubOutWithMock(reports_cache.models, 'ReportsCache')
-    self.mox.StubOutWithMock(reports_cache.gae_util, 'ObtainLock')
-    self.mox.StubOutWithMock(reports_cache.gae_util, 'ReleaseLock')
-
-    reports_cache.gae_util.ObtainLock('msu_user_summary_lock').AndReturn(True)
-    reports_cache.models.ComputerMSULog.all().AndReturn(lquery)
-    reports_cache.models.KeyValueCache.MemcacheWrappedGet(
-        'msu_user_summary_cursor', 'text_value').AndReturn(cursor)
-    reports_cache.models.ReportsCache.GetMsuUserSummary(
-        since=None, tmp=True).AndReturn((summary, None))
-    reports_cache.models.ReportsCache.SetMsuUserSummary(
-        summary_output, since=None, tmp=True).AndReturn(None)
-
-    lquery.fetch(rc.FETCH_LIMIT).AndReturn(reports)
-
-    reports_cache.models.ReportsCache.SetMsuUserSummary(
-        summary_output, since=None).AndReturn(None)
-    reports_cache.models.KeyValueCache.DeleteMemcacheWrap(
-        'msu_user_summary_cursor', prop_name='text_value')
-    reports_cache.models.ReportsCache.DeleteMsuUserSummary(
-        since=None, tmp=True).AndReturn(None)
-    reports_cache.gae_util.ReleaseLock('msu_user_summary_lock').AndReturn(True)
-
-    self.mox.ReplayAll()
     rc._GenerateMsuUserSummary()
-    self.mox.VerifyAll()
+
+    summary, _ = reports_cache.models.ReportsCache.GetMsuUserSummary(
+        since=None, tmp=True)
+    self.assertEqual(summary_output, summary)
 
   def testGenerateMsuUserSummaryWhenData(self):
     """Test _GenerateMsuUserSummary()."""
@@ -224,10 +187,7 @@ class ReportsCacheCleanupTest(mox.MoxTestBase):
     self.mox.StubOutWithMock(reports_cache.models, 'ComputerMSULog')
     self.mox.StubOutWithMock(reports_cache.models, 'KeyValueCache')
     self.mox.StubOutWithMock(reports_cache.models, 'ReportsCache')
-    self.mox.StubOutWithMock(reports_cache.gae_util, 'ObtainLock')
-    self.mox.StubOutWithMock(reports_cache.gae_util, 'ReleaseLock')
 
-    reports_cache.gae_util.ObtainLock('msu_user_summary_lock').AndReturn(True)
     reports_cache.models.ComputerMSULog.all().AndReturn(lquery)
     reports_cache.models.KeyValueCache.MemcacheWrappedGet(
         'msu_user_summary_cursor', 'text_value').AndReturn(cursor)
@@ -255,7 +215,6 @@ class ReportsCacheCleanupTest(mox.MoxTestBase):
         'msu_user_summary_cursor', prop_name='text_value')
     reports_cache.models.ReportsCache.DeleteMsuUserSummary(
         since=None, tmp=True).AndReturn(None)
-    reports_cache.gae_util.ReleaseLock('msu_user_summary_lock').AndReturn(True)
 
     self.mox.ReplayAll()
     rc._GenerateMsuUserSummary()
@@ -307,10 +266,7 @@ class ReportsCacheCleanupTest(mox.MoxTestBase):
     self.mox.StubOutWithMock(reports_cache.models, 'ComputerMSULog')
     self.mox.StubOutWithMock(reports_cache.models, 'KeyValueCache')
     self.mox.StubOutWithMock(reports_cache.models, 'ReportsCache')
-    self.mox.StubOutWithMock(reports_cache.gae_util, 'ObtainLock')
-    self.mox.StubOutWithMock(reports_cache.gae_util, 'ReleaseLock')
 
-    reports_cache.gae_util.ObtainLock('msu_user_summary_lock').AndReturn(True)
     reports_cache.models.ComputerMSULog.all().AndReturn(lquery)
     reports_cache.models.KeyValueCache.MemcacheWrappedGet(
         'msu_user_summary_cursor', 'text_value').AndReturn(cursor)
@@ -338,7 +294,6 @@ class ReportsCacheCleanupTest(mox.MoxTestBase):
         'msu_user_summary_cursor', prop_name='text_value')
     reports_cache.models.ReportsCache.DeleteMsuUserSummary(
         since=None, tmp=True).AndReturn(None)
-    reports_cache.gae_util.ReleaseLock('msu_user_summary_lock').AndReturn(True)
 
     self.mox.ReplayAll()
     rc._GenerateMsuUserSummary()
@@ -363,7 +318,6 @@ class ReportsCacheCleanupTest(mox.MoxTestBase):
 
     reports = []
     cursor = None
-    lock_name = 'msu_user_summary_lock_%dD' % since_days
     summary = None
     summary_output = self._GenBaseSummaryOutput(rc)
     summary_empty = summary_output.copy()
@@ -373,10 +327,7 @@ class ReportsCacheCleanupTest(mox.MoxTestBase):
     self.mox.StubOutWithMock(reports_cache.models, 'ComputerMSULog')
     self.mox.StubOutWithMock(reports_cache.models, 'KeyValueCache')
     self.mox.StubOutWithMock(reports_cache.models, 'ReportsCache')
-    self.mox.StubOutWithMock(reports_cache.gae_util, 'ObtainLock')
-    self.mox.StubOutWithMock(reports_cache.gae_util, 'ReleaseLock')
 
-    reports_cache.gae_util.ObtainLock(lock_name).AndReturn(True)
     reports_cache.models.ComputerMSULog.all().AndReturn(lquery)
     reports_cache.models.KeyValueCache.MemcacheWrappedGet(
         'msu_user_summary_cursor_%dD' % since_days, 'text_value').AndReturn(cursor)
@@ -404,7 +355,6 @@ class ReportsCacheCleanupTest(mox.MoxTestBase):
         'msu_user_summary_cursor_%dD' % since_days, prop_name='text_value')
     reports_cache.models.ReportsCache.DeleteMsuUserSummary(
         since='%dD' % since_days, tmp=True).AndReturn(None)
-    reports_cache.gae_util.ReleaseLock(lock_name).AndReturn(True)
 
     self.mox.ReplayAll()
     rc._GenerateMsuUserSummary(since_days=since_days, now=now)
@@ -430,7 +380,6 @@ class ReportsCacheCleanupTest(mox.MoxTestBase):
     reports = []
     cursor = None
     cursor_name = 'msu_user_summary_cursor_%dD' % since_days
-    lock_name = 'msu_user_summary_lock_%dD' % since_days
     summary = None
     summary_output = self._GenBaseSummaryOutput(rc)
     summary_empty = summary_output.copy()
@@ -440,10 +389,7 @@ class ReportsCacheCleanupTest(mox.MoxTestBase):
     self.mox.StubOutWithMock(reports_cache.models, 'ComputerMSULog')
     self.mox.StubOutWithMock(reports_cache.models, 'KeyValueCache')
     self.mox.StubOutWithMock(reports_cache.models, 'ReportsCache')
-    self.mox.StubOutWithMock(reports_cache.gae_util, 'ObtainLock')
-    self.mox.StubOutWithMock(reports_cache.gae_util, 'ReleaseLock')
 
-    reports_cache.gae_util.ObtainLock(lock_name).AndReturn(True)
     reports_cache.models.ComputerMSULog.all().AndReturn(lquery)
     reports_cache.models.KeyValueCache.MemcacheWrappedGet(
         cursor_name, 'text_value').AndReturn(cursor)
@@ -471,7 +417,6 @@ class ReportsCacheCleanupTest(mox.MoxTestBase):
         cursor_name, prop_name='text_value')
     reports_cache.models.ReportsCache.DeleteMsuUserSummary(
         since='%dD' % since_days, tmp=True).AndReturn(None)
-    reports_cache.gae_util.ReleaseLock(lock_name).AndReturn(True)
 
     self.mox.ReplayAll()
     rc._GenerateMsuUserSummary(since_days=since_days, now=now)
@@ -512,10 +457,7 @@ class ReportsCacheCleanupTest(mox.MoxTestBase):
     self.mox.StubOutWithMock(reports_cache.models, 'ComputerMSULog')
     self.mox.StubOutWithMock(reports_cache.models, 'KeyValueCache')
     self.mox.StubOutWithMock(reports_cache.models, 'ReportsCache')
-    self.mox.StubOutWithMock(reports_cache.gae_util, 'ObtainLock')
-    self.mox.StubOutWithMock(reports_cache.gae_util, 'ReleaseLock')
 
-    reports_cache.gae_util.ObtainLock('msu_user_summary_lock').AndReturn(True)
     reports_cache.models.ComputerMSULog.all().AndReturn(lquery)
     reports_cache.models.KeyValueCache.MemcacheWrappedGet(
         'msu_user_summary_cursor', 'text_value').AndReturn(cursor)
@@ -543,7 +485,6 @@ class ReportsCacheCleanupTest(mox.MoxTestBase):
         'msu_user_summary_cursor', prop_name='text_value')
     reports_cache.models.ReportsCache.DeleteMsuUserSummary(
         since=None, tmp=True).AndReturn(None)
-    reports_cache.gae_util.ReleaseLock('msu_user_summary_lock').AndReturn(True)
 
     self.mox.ReplayAll()
     rc._GenerateMsuUserSummary()
@@ -584,13 +525,10 @@ class ReportsCacheCleanupTest(mox.MoxTestBase):
     self.mox.StubOutWithMock(reports_cache.models, 'ComputerMSULog')
     self.mox.StubOutWithMock(reports_cache.models, 'KeyValueCache')
     self.mox.StubOutWithMock(reports_cache.models, 'ReportsCache')
-    self.mox.StubOutWithMock(reports_cache.gae_util, 'ObtainLock')
-    self.mox.StubOutWithMock(reports_cache.gae_util, 'ReleaseLock')
 
-    self.mox.StubOutWithMock(reports_cache.time, 'time')
+    self.mox.StubOutWithMock(reports_cache, 'time')
     self.mox.StubOutWithMock(reports_cache, 'taskqueue')
 
-    reports_cache.gae_util.ObtainLock('msu_user_summary_lock').AndReturn(True)
     reports_cache.models.ComputerMSULog.all().AndReturn(lquery)
     reports_cache.models.KeyValueCache.MemcacheWrappedGet(
         'msu_user_summary_cursor', 'text_value').AndReturn(cursor)
@@ -623,10 +561,8 @@ class ReportsCacheCleanupTest(mox.MoxTestBase):
         url='/cron/reports_cache/msu_user_summary',
         method='GET',
         countdown=5).AndReturn(None)
-    reports_cache.gae_util.ReleaseLock('msu_user_summary_lock').AndReturn(True)
 
     # second run
-    reports_cache.gae_util.ObtainLock('msu_user_summary_lock').AndReturn(True)
     reports_cache.models.ComputerMSULog.all().AndReturn(lquery)
     reports_cache.models.KeyValueCache.MemcacheWrappedGet(
         'msu_user_summary_cursor', 'text_value').AndReturn(last_user_cursor)
@@ -642,7 +578,6 @@ class ReportsCacheCleanupTest(mox.MoxTestBase):
         'msu_user_summary_cursor', prop_name='text_value')
     reports_cache.models.ReportsCache.DeleteMsuUserSummary(
         since=None, tmp=True).AndReturn(None)
-    reports_cache.gae_util.ReleaseLock('msu_user_summary_lock').AndReturn(True)
 
     self.mox.ReplayAll()
     rc._GenerateMsuUserSummary()
@@ -718,8 +653,6 @@ class ReportsCacheCleanupTest(mox.MoxTestBase):
     new_bar_success2.IsSuccess().AndReturn(True)
 
     self.mox.StubOutWithMock(reports_cache.models, 'KeyValueCache')
-    self.mox.StubOutWithMock(reports_cache.gae_util, 'ObtainLock')
-    self.mox.StubOutWithMock(reports_cache.gae_util, 'ReleaseLock')
     self.mox.StubOutWithMock(
         reports_cache.models.KeyValueCache, 'get_by_key_name')
     self.mox.StubOutWithMock(reports_cache.models.InstallLog, 'all')
@@ -727,9 +660,6 @@ class ReportsCacheCleanupTest(mox.MoxTestBase):
         reports_cache.models.ReportsCache, 'GetInstallCounts')
     self.mox.StubOutWithMock(
         reports_cache.models.ReportsCache, 'SetInstallCounts')
-
-    lock_name = 'pkgs_list_cron_lock'
-    reports_cache.gae_util.ObtainLock(lock_name).AndReturn(True)
 
     reports_cache.models.ReportsCache.GetInstallCounts().AndReturn(
         (install_counts, None))
@@ -750,7 +680,6 @@ class ReportsCacheCleanupTest(mox.MoxTestBase):
     self.mox.StubOutWithMock(reports_cache.deferred, 'defer')
     reports_cache.deferred.defer(
         reports_cache._GenerateInstallCounts).AndReturn(None)
-    reports_cache.gae_util.ReleaseLock(lock_name).AndReturn(True)
 
     self.mox.ReplayAll()
     reports_cache._GenerateInstallCounts()
@@ -801,7 +730,7 @@ class ReportsCacheCleanupTest(mox.MoxTestBase):
         reports_cache.models.ReportsCache.GetTrendingInstalls(1)[0])
 
   def testGenerateComputersSummaryCache(self):
-    today = datetime.datetime.now()
+    today = datetime.datetime.utcnow()
     models.Computer(
         active=True, hostname='xyz-macbook', serial='SERIAL',
         uuid='UUID', owner='zerocool', client_version='2.3.3',

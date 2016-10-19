@@ -14,21 +14,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 #
-"""Load App Engine package from zip."""
+"""Stub."""
 
-import sys
-import os
-try:
-  import google.appengine.runtime
-except ImportError:
-  from pkgutil import extend_path as _extend_path
-  import google
-  _path = '%s/gae_server.zip' % os.path.dirname(os.path.realpath(__file__))
-  google.__path__ = _extend_path(['%s/google' % _path], google.__name__)
-  import google.appengine
-  google.appengine.__path__ = _extend_path(['%s/google/appengine' % _path], google.__name__)
 
-# webapp have different django detection logic for old runtime.
-os.environ['APPENGINE_RUNTIME'] = 'python27'
 
-import google.appengine.runtime
+def FuzzedExponentialIntervals(initial_delay, attempts):
+  return [initial_delay] * attempts
